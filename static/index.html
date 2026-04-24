@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stats-Optimizer V2 Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Inter', -apple-system, sans-serif; background: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { color: #1a202c; text-align: center; }
+        
+        .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+        
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px;}
+        .card h2 { margin-top: 0; font-size: 1.2rem; color: #2d3748; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;}
+        
+        .control-group { margin-bottom: 15px; }
+        .control-group label { display: flex; align-items: center; cursor: pointer; font-weight: 500;}
+        .control-group input[type="checkbox"] { margin-right: 10px; width: 18px; height: 18px; }
+        
+        button { background: #4299e1; color: white; border: none; padding: 12px 20px; border-radius: 6px; font-size: 1rem; cursor: pointer; width: 100%; font-weight: bold;}
+        button:hover { background: #3182ce; }
+        
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1.1rem;}
+        .stat-value { font-weight: bold; color: #2b6cb0; }
+        
+        .alert-box { background: #fed7d7; color: #c53030; padding: 15px; border-radius: 8px; margin-top: 15px; display: none; border: 1px solid #feb2b2;}
+        .alert-title { font-weight: bold; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📊 Stats-Optimizer V2 Engine Verification</h1>
+    
+    <div class="grid">
+        <!-- Sidebar Controls -->
+        <div>
+            <div class="card">
+                <h2>Engine Toggles</h2>
+                <div class="control-group">
+                    <label><input type="checkbox" id="toggleCorrelated" checked> Correlated Errors (상관 오차)</label>
+                </div>
+                <div class="control-group">
+                    <label><input type="checkbox" id="toggleSmoothing" checked> Time-Series Smoothing (추세선)</label>
+                </div>
+                <div class="control-group">
+                    <label><input type="checkbox" id="toggleStress" checked> Stress Test (민감도 쇼크)</label>
+                </div>
+                <button onclick="runAnalysis()">▶ Run Analysis</button>
+            </div>
+            
+            <div class="card" id="resultsCard" style="display: none;">
+                <h2>Final Predictions</h2>
+                <div class="stat-row">
+                    <span id="lblTarget1">Target 1:</span> <span class="stat-value" id="resSupport1">--</span>
+                </div>
+                <div class="stat-row">
+                    <span id="lblTarget2">Target 2:</span> <span class="stat-value" id="resSupport2">--</span>
+                </div>
+                <div class="stat-row" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                    <span id="lblWinTarget1">Target 1 Win Prob:</span> <span class="stat-value" style="color:#c53030; font-size: 1.4rem;" id="resWin1">--</span>
+                </div>
+            </div>
+            
+            <div class="alert-box" id="stressAlert">
+                <div class="alert-title">⚠️ Stress Test Alert</div>
+                <div id="stressMessage">Model is highly fragile.</div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div>
+            <div class="card" id="chartCard" style="display: none;">
+                <h2>Smoothed Trend Lines</h2>
+                <canvas id="trendChart"></canvas>
+            </div>
+            
+            <div class="card">
+                <h2>Raw Mock Data Injected</h2>
+                <pre id="mockDataDisplay" style="font-size: 0.8rem; background: #f7fafc; padding: 10px; border-radius: 4px; overflow-x: auto;"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let trendChartInstance = null;
+
+    // We can swap this mock data out. Let's try region-party data as an example.
+    const mockData = [
+        {"agency": "Gallup", "date": "2026-04-18", "results": {"party_democratic": 45, "party_republican": 40, "party_independent": 15}, "sample_size": 1000},
+        {"agency": "Pew", "date": "2026-04-20", "results": {"party_democratic": 42, "party_republican": 44, "party_independent": 14}, "sample_size": 1000},
+        {"agency": "Rasmussen", "date": "2026-04-22", "results": {"party_democratic": 39, "party_republican": 48, "party_independent": 13}, "sample_size": 1000},
+        {"agency": "Ipsos", "date": "2026-04-24", "results": {"party_democratic": 44, "party_republican": 43, "party_independent": 13}, "sample_size": 1000}
+    ];
+    const mockPrior = {"party_democratic": 43.0, "party_republican": 43.0, "party_independent": 14.0};
+    const mockFundamentals = {"party_democratic": +1.0, "party_republican": -1.0, "party_independent": 0.0};
+    
+    // Automatically extract targets from the first mock data item
+    const TARGETS = Object.keys(mockData[0].results);
+    const TARGET_1 = TARGETS[0]; // e.g., party_democratic
+    const TARGET_2 = TARGETS[1]; // e.g., party_republican
+
+    // Update the UI labels dynamically based on targets
+    document.getElementById('lblTarget1').innerText = TARGET_1 + ':';
+    document.getElementById('lblTarget2').innerText = TARGET_2 + ':';
+    document.getElementById('lblWinTarget1').innerText = TARGET_1 + ' Win Prob:';
+
+    let mdText = "### Mock Polling Data\n\n";
+    mdText += `| Agency | Date | ${TARGET_1} | ${TARGET_2} | Sample Size |\n`;
+    mdText += "|--------|------|-------------|-------------|-------------|\n";
+    mockData.forEach(d => {
+        mdText += `| ${d.agency.padEnd(12)} | ${d.date} | ${d.results[TARGET_1]}%        | ${d.results[TARGET_2]}%        | ${d.sample_size}        |\n`;
+    });
+    
+    document.getElementById('mockDataDisplay').innerText = mdText;
+
+    async function runAnalysis() {
+        const config = {
+            use_correlated_errors: document.getElementById('toggleCorrelated').checked,
+            use_smoothing: document.getElementById('toggleSmoothing').checked,
+            run_stress_test: document.getElementById('toggleStress').checked,
+            target_1: TARGET_1,
+            target_2: TARGET_2
+        };
+        
+        const payload = {
+            data: mockData,
+            prior_data: mockPrior,
+            fundamentals: mockFundamentals,
+            config: config
+        };
+
+        try {
+            const response = await fetch('/api/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            
+            // Update Text Results
+            document.getElementById('resultsCard').style.display = 'block';
+            document.getElementById('resSupport1').innerText = result.summary[TARGET_1].weighted_mean.toFixed(2) + '%';
+            document.getElementById('resSupport2').innerText = result.summary[TARGET_2].weighted_mean.toFixed(2) + '%';
+            document.getElementById('resWin1').innerText = result.prediction.target_1_win_prob.toFixed(1) + '%';
+            
+            // Handle Chart
+            if (result.trend_lines) {
+                document.getElementById('chartCard').style.display = 'block';
+                renderChart(result.trend_lines);
+            } else {
+                document.getElementById('chartCard').style.display = 'none';
+            }
+            
+            // Handle Stress Test
+            const alertBox = document.getElementById('stressAlert');
+            if (result.stress_test_report) {
+                const r = result.stress_test_report;
+                alertBox.style.display = 'block';
+                document.getElementById('stressMessage').innerHTML = `
+                    Status: <b>${r.status}</b><br>
+                    Baseline ${TARGET_1} Prob: ${r.baseline_prob_1.toFixed(1)}%<br>
+                    Shocked ${TARGET_1} Prob: ${r.shocked_prob_1.toFixed(1)}%<br>
+                    Delta: ${r.delta_1.toFixed(1)}%
+                `;
+            } else {
+                alertBox.style.display = 'none';
+            }
+            
+        } catch (e) {
+            alert("Error running analysis. Is the server running?");
+            console.error(e);
+        }
+    }
+
+    function renderChart(trendData) {
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        
+        // Extract dates from Target 1's trend line
+        const labels = trendData[TARGET_1].map(d => d.date);
+        const data1 = trendData[TARGET_1].map(d => d.smoothed_value);
+        const data2 = trendData[TARGET_2].map(d => d.smoothed_value);
+
+        if (trendChartInstance) {
+            trendChartInstance.destroy();
+        }
+
+        trendChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: TARGET_1,
+                        data: data1,
+                        borderColor: '#c53030', // Red-ish
+                        backgroundColor: 'rgba(197, 48, 48, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: TARGET_2,
+                        data: data2,
+                        borderColor: '#2b6cb0', // Blue-ish
+                        backgroundColor: 'rgba(43, 108, 176, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'bottom' } },
+                scales: { y: { min: 30, max: 60 } }
+            }
+        });
+    }
+</script>
+</body>
+</html>

@@ -35,9 +35,13 @@ class StatsOptimizer:
             
         analysis = model.analyze()
         
+        # Extract dynamic targets from config or fallback to defaults
+        target_1 = self.config.get("target_1", "candidate_a")
+        target_2 = self.config.get("target_2", "candidate_b")
+
         # 2. Feature: Correlated Errors
         use_corr = self.config.get("use_correlated_errors", False)
-        predictions = model.simulate_win_probability(use_correlated_errors=use_corr)
+        predictions = model.simulate_win_probability(use_correlated_errors=use_corr, target_1=target_1, target_2=target_2)
         
         result = {
             "status": "success",
@@ -49,18 +53,18 @@ class StatsOptimizer:
         # 3. Feature: Time-Series Smoothing
         if self.config.get("use_smoothing", False):
             smoother = TimeSeriesSmoother(window_days=7)
-            result["trend_lines"] = smoother.smooth(data, target_keys=["candidate_a", "candidate_b"])
+            result["trend_lines"] = smoother.smooth(data, target_keys=[target_1, target_2])
             
         # 4. Feature: Stress Testing
         if self.config.get("run_stress_test", False):
             tester = StressTester(data)
-            # Inject a sudden 15-point swing to B
+            # Inject a sudden 15-point swing to Target 2
             mock_shock = {
                 "agency": "Shock_Poll", "date": "2026-04-25",
-                "results": {"candidate_a": 35, "candidate_b": 50},
+                "results": {target_1: 35, target_2: 50},
                 "sample_size": 2000, "response_rate": 0.2, "method": "CATI"
             }
-            result["stress_test_report"] = tester.run_shock_scenario(mock_shock)
+            result["stress_test_report"] = tester.run_shock_scenario(mock_shock, target_1=target_1, target_2=target_2)
 
         return result
 

@@ -26,24 +26,32 @@ class ElectionPredictionModel(BaseStatisticalModel):
         super().__init__(data, strategies=strategies)
         self.detector = OutlierDetector(threshold=1.5) # Sensitive detection
 
-    def analyze(self) -> Dict:
+    def analyze(self, primary_target: str = "candidate_a") -> Dict:
         """
         Runs validation and pipeline.
         """
         # Step 1: Detect outliers before final weighted mean calculation
-        self.raw_data = self.detector.detect_and_flag(self.raw_data, "candidate_a")
+        # Use the primary target (or fallback) for outlier detection
+        if self.raw_data and primary_target not in self.raw_data[0]["results"]:
+            primary_target = list(self.raw_data[0]["results"].keys())[0]
+
+        self.raw_data = self.detector.detect_and_flag(self.raw_data, primary_target)
         
         # Step 2: Run strategy pipeline
         return super().analyze()
 
-    def simulate_win_probability(self, simulations: int = 10000, use_correlated_errors: bool = False) -> Dict:
-        analysis = self.analyze()
-        mean_a = analysis["candidate_a"]["weighted_mean"]
-        mean_b = analysis["candidate_b"]["weighted_mean"]
+    def simulate_win_probability(self, simulations: int = 10000, use_correlated_errors: bool = False, target_1: str = "candidate_a", target_2: str = "candidate_b") -> Dict:
+        analysis = self.analyze(primary_target=target_1)
+        # Fallback if targets are not found in analysis
+        if target_1 not in analysis or target_2 not in analysis:
+            return {"error": "Targets not found in data", "target_1_win_prob": 0.0, "target_2_win_prob": 0.0}
+
+        mean_1 = analysis[target_1]["weighted_mean"]
+        mean_2 = analysis[target_2]["weighted_mean"]
         
         # 1. Consensus Variance: How much do polls disagree?
-        raw_values_a = [d["results"].get("candidate_a", mean_a) for d in self.raw_data]
-        poll_std = np.std(raw_values_a) if len(raw_values_a) > 1 else 3.0
+        raw_values_1 = [d["results"].get(target_1, mean_1) for d in self.raw_data]
+        poll_std = np.std(raw_values_1) if len(raw_values_1) > 1 else 3.0
         
         # 2. Sample Size Impact: More people = less uncertainty
         total_n = sum([d.get("sample_size", 1000) for d in self.raw_data])
@@ -55,18 +63,18 @@ class ElectionPredictionModel(BaseStatisticalModel):
         if use_correlated_errors:
             # Simulate a systemic polling error (e.g., all polls miss by X points)
             systemic_error = np.random.normal(0, uncertainty * 0.5, simulations)
-            # Both candidates are affected inversely by the systemic error
-            sim_a = np.random.normal(mean_a, uncertainty * 0.8, simulations) + systemic_error
-            sim_b = np.random.normal(mean_b, uncertainty * 0.8, simulations) - systemic_error
+            # Both targets are affected inversely by the systemic error
+            sim_1 = np.random.normal(mean_1, uncertainty * 0.8, simulations) + systemic_error
+            sim_2 = np.random.normal(mean_2, uncertainty * 0.8, simulations) - systemic_error
         else:
-            sim_a = np.random.normal(mean_a, uncertainty, simulations)
-            sim_b = np.random.normal(mean_b, uncertainty, simulations)
+            sim_1 = np.random.normal(mean_1, uncertainty, simulations)
+            sim_2 = np.random.normal(mean_2, uncertainty, simulations)
         
-        wins_a = np.sum(sim_a > sim_b)
+        wins_1 = np.sum(sim_1 > sim_2)
         
         return {
-            "candidate_a_win_prob": (wins_a / simulations) * 100,
-            "candidate_b_win_prob": (1 - (wins_a / simulations)) * 100,
+            "target_1_win_prob": (wins_1 / simulations) * 100,
+            "target_2_win_prob": (1 - (wins_1 / simulations)) * 100,
             "simulations_run": simulations,
             "calculated_uncertainty": float(uncertainty),
             "used_correlated_errors": use_correlated_errors
