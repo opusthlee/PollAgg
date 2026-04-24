@@ -89,20 +89,24 @@ class HouseBiasStrategy(BaseStrategy):
 
 class BayesianAdjustmentStrategy(BaseStrategy):
     """
-    Adjusts results based on a 'Prior' belief (e.g., historical party strength).
-    The more data (total sample size) we have, the less the Prior matters.
+    Adjusts results based on a 'Prior' belief. 
+    In V2, this incorporates both past polls and 'Fundamentals' (e.g., economic indicators).
     """
-    def __init__(self, prior_results: Dict[str, float], strength: float = 0.2):
+    def __init__(self, prior_results: Dict[str, float], fundamentals_score: Dict[str, float] = None, strength: float = 0.2):
         self.prior_results = prior_results
-        self.strength = strength # How much to weigh the prior (0 to 1)
+        self.fundamentals_score = fundamentals_score or {}
+        self.strength = strength # Base strength of the prior
 
     def apply(self, data: List[Dict], weights: List[float]) -> List[float]:
-        # This strategy calculates a global adjustment factor
-        # It's better applied at the final aggregation, but we can simulate it by adjusting individual polls
         for item in data:
             results = item["results"]
             for key, prior_val in self.prior_results.items():
                 if key in results:
-                    # Blend the poll result with the prior
-                    results[key] = (results[key] * (1 - self.strength)) + (prior_val * self.strength)
+                    # If fundamentals exist for this candidate, adjust the prior slightly
+                    fund_boost = self.fundamentals_score.get(key, 0.0)
+                    adjusted_prior = prior_val + fund_boost
+                    
+                    # Blend the poll result with the adjusted prior
+                    results[key] = (results[key] * (1 - self.strength)) + (adjusted_prior * self.strength)
         return weights
+

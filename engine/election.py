@@ -36,12 +36,11 @@ class ElectionPredictionModel(BaseStatisticalModel):
         # Step 2: Run strategy pipeline
         return super().analyze()
 
-    def simulate_win_probability(self, simulations: int = 10000) -> Dict:
+    def simulate_win_probability(self, simulations: int = 10000, use_correlated_errors: bool = False) -> Dict:
         analysis = self.analyze()
         mean_a = analysis["candidate_a"]["weighted_mean"]
         mean_b = analysis["candidate_b"]["weighted_mean"]
         
-        # --- DYNAMIC UNCERTAINTY CALCULATION ---
         # 1. Consensus Variance: How much do polls disagree?
         raw_values_a = [d["results"].get("candidate_a", mean_a) for d in self.raw_data]
         poll_std = np.std(raw_values_a) if len(raw_values_a) > 1 else 3.0
@@ -51,11 +50,17 @@ class ElectionPredictionModel(BaseStatisticalModel):
         sample_error_reduction = 1 / np.sqrt(total_n / 1000)
         
         # 3. Final Uncertainty Score
-        # Minimum uncertainty is 2.0 (polls are never perfect), Max 8.0
         uncertainty = np.clip(poll_std * sample_error_reduction + 1.0, 2.0, 8.0)
         
-        sim_a = np.random.normal(mean_a, uncertainty, simulations)
-        sim_b = np.random.normal(mean_b, uncertainty, simulations)
+        if use_correlated_errors:
+            # Simulate a systemic polling error (e.g., all polls miss by X points)
+            systemic_error = np.random.normal(0, uncertainty * 0.5, simulations)
+            # Both candidates are affected inversely by the systemic error
+            sim_a = np.random.normal(mean_a, uncertainty * 0.8, simulations) + systemic_error
+            sim_b = np.random.normal(mean_b, uncertainty * 0.8, simulations) - systemic_error
+        else:
+            sim_a = np.random.normal(mean_a, uncertainty, simulations)
+            sim_b = np.random.normal(mean_b, uncertainty, simulations)
         
         wins_a = np.sum(sim_a > sim_b)
         
@@ -63,5 +68,7 @@ class ElectionPredictionModel(BaseStatisticalModel):
             "candidate_a_win_prob": (wins_a / simulations) * 100,
             "candidate_b_win_prob": (1 - (wins_a / simulations)) * 100,
             "simulations_run": simulations,
-            "calculated_uncertainty": float(uncertainty)
+            "calculated_uncertainty": float(uncertainty),
+            "used_correlated_errors": use_correlated_errors
         }
+
