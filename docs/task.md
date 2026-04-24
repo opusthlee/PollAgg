@@ -1,0 +1,22 @@
+# Tasks: Stats-Optimizer Advanced Refactoring
+
+- [x] Core Strategy Framework Implementation
+    - [x] Create `engine/strategies.py` with base and initial strategies
+    - [x] Implement `TimeDecayStrategy`
+    - [x] Implement `ResponseRateStrategy`
+- [x] Refactor Engine Core
+    - [x] Update `engine/base.py` to support strategy injection
+    - [x] Update `engine/survey.py` to use strategy pipeline
+- [x] Outlier & Validation Layer
+    - [x] Create `engine/validators.py` with `OutlierDetector`
+    - [x] Integrate validator into the analysis pipeline
+- [x] Advanced Election Logic
+    - [x] Move house bias correction to `HouseBiasStrategy` in `strategies.py`
+    - [x] Enhance Monte Carlo simulation with dynamic variance
+- [x] Integration Verification
+    - [x] Create `scratch/test_strategy_pipeline.py`
+    - [x] Verify parity with previous results
+- [x] Final Engine Polish & Optimization
+    - [x] Implement Dynamic Variance in `ElectionPredictionModel`
+    - [x] Create `main.py` as the orchestrator
+    - [x] Add `BayesianAdjustmentStrategy` placeholder

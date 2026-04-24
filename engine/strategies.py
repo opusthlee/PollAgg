@@ -1,0 +1,108 @@
+import numpy as np
+from abc import ABC, abstractmethod
+from datetime import datetime
+from typing import List, Dict
+
+class BaseStrategy(ABC):
+    """
+    Abstract base class for all statistical strategies.
+    Autoresearch can subclass this to add new optimization logic.
+    """
+    @abstractmethod
+    def apply(self, data: List[Dict], weights: List[float]) -> List[float]:
+        """
+        Apply the strategy and return the updated weights.
+        """
+        pass
+
+class TimeDecayStrategy(BaseStrategy):
+    """
+    Applies exponential decay based on the recency of the data.
+    """
+    def __init__(self, decay_rate: float = 0.05, reference_date: datetime = None):
+        self.decay_rate = decay_rate
+        self.reference_date = reference_date or datetime.now()
+
+    def apply(self, data: List[Dict], weights: List[float]) -> List[float]:
+        new_weights = []
+        for i, item in enumerate(data):
+            # Expects item to have a 'date' field
+            date_str = item.get("date")
+            if not date_str:
+                new_weights.append(weights[i])
+                continue
+                
+            item_date = datetime.strptime(date_str, "%Y-%m-%d")
+            days_diff = (self.reference_date - item_date).days
+            decay = np.exp(-self.decay_rate * max(0, days_diff))
+            new_weights.append(weights[i] * decay)
+        return new_weights
+
+class ResponseRateStrategy(BaseStrategy):
+    """
+    Adjusts weights based on the response rate quality.
+    """
+    def __init__(self, target_rate: float = 0.15, floor: float = 0.5):
+        self.target_rate = target_rate
+        self.floor = floor
+
+    def apply(self, data: List[Dict], weights: List[float]) -> List[float]:
+        new_weights = []
+        for i, item in enumerate(data):
+            rr = item.get("response_rate", self.target_rate)
+            rr_weight = np.clip(rr / self.target_rate, self.floor, 1.2)
+            new_weights.append(weights[i] * rr_weight)
+        return new_weights
+
+class MethodologyStrategy(BaseStrategy):
+    """
+    Weights different survey methodologies (e.g., CATI vs ARS).
+    """
+    def __init__(self, method_weights: Dict[str, float] = None):
+        self.method_weights = method_weights or {"CATI": 1.2, "ARS": 0.8}
+
+    def apply(self, data: List[Dict], weights: List[float]) -> List[float]:
+        new_weights = []
+        for i, item in enumerate(data):
+            method = item.get("method", "Unknown")
+            w = self.method_weights.get(method, 1.0)
+            new_weights.append(weights[i] * w)
+        return new_weights
+
+class HouseBiasStrategy(BaseStrategy):
+    """
+    Corrects for known pollster bias (House Effect).
+    Note: This modifies the results data, not just the weights.
+    """
+    def __init__(self, bias_table: Dict[str, Dict[str, float]]):
+        self.bias_table = bias_table
+
+    def apply(self, data: List[Dict], weights: List[float]) -> List[float]:
+        for item in data:
+            agency = item.get("agency")
+            if agency in self.bias_table:
+                biases = self.bias_table[agency]
+                for key, bias_val in biases.items():
+                    if key in item["results"]:
+                        item["results"][key] -= bias_val
+        return weights
+
+class BayesianAdjustmentStrategy(BaseStrategy):
+    """
+    Adjusts results based on a 'Prior' belief (e.g., historical party strength).
+    The more data (total sample size) we have, the less the Prior matters.
+    """
+    def __init__(self, prior_results: Dict[str, float], strength: float = 0.2):
+        self.prior_results = prior_results
+        self.strength = strength # How much to weigh the prior (0 to 1)
+
+    def apply(self, data: List[Dict], weights: List[float]) -> List[float]:
+        # This strategy calculates a global adjustment factor
+        # It's better applied at the final aggregation, but we can simulate it by adjusting individual polls
+        for item in data:
+            results = item["results"]
+            for key, prior_val in self.prior_results.items():
+                if key in results:
+                    # Blend the poll result with the prior
+                    results[key] = (results[key] * (1 - self.strength)) + (prior_val * self.strength)
+        return weights
