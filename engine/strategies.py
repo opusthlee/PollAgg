@@ -48,9 +48,18 @@ class ResponseRateStrategy(BaseStrategy):
 
     def apply(self, data: List[Dict], weights: List[float]) -> List[float]:
         new_weights = []
+        # k: steepness, mid: inflection point
+        k = 30.0
+        mid = 0.10
+        amplitude = 1.2 - self.floor
+        
         for i, item in enumerate(data):
-            rr = item.get("response_rate", self.target_rate)
-            rr_weight = np.clip(rr / self.target_rate, self.floor, 1.2)
+            rr = item.get("response_rate")
+            if rr is None:
+                rr = self.target_rate
+                
+            # Sigmoid formula: floor + (amplitude / (1 + e^(-k(x - mid))))
+            rr_weight = self.floor + (amplitude / (1 + np.exp(-k * (rr - mid))))
             new_weights.append(weights[i] * rr_weight)
         return new_weights
 
