@@ -2,6 +2,9 @@ import numpy as np
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import List, Dict
+import logging
+
+logger = logging.getLogger(__name__)
 
 class BaseStrategy(ABC):
     """
@@ -32,7 +35,15 @@ class TimeDecayStrategy(BaseStrategy):
                 new_weights.append(weights[i])
                 continue
                 
-            item_date = datetime.strptime(date_str, "%Y-%m-%d")
+            try:
+                item_date = datetime.strptime(date_str, "%Y-%m-%d")
+            except (ValueError, TypeError):
+                # 날짜 파싱 실패 시 현재 날짜로부터 30일 전으로 가정하거나 가중치 보존
+                if date_str:
+                    logger.warning(f"Invalid date format: '{date_str}'. Expected YYYY-MM-DD. Skipping decay.")
+                new_weights.append(weights[i])
+                continue
+
             days_diff = (self.reference_date - item_date).days
             decay = np.exp(-self.decay_rate * max(0, days_diff))
             new_weights.append(weights[i] * decay)

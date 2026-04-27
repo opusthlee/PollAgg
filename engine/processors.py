@@ -19,11 +19,28 @@ class TimeSeriesSmoother:
         if not data:
             return {}
 
+        def _safe_parse_date(d_str):
+            try:
+                return datetime.strptime(d_str, "%Y-%m-%d")
+            except (ValueError, TypeError):
+                # 기본값 또는 건너뛰기를 위해 None 반환
+                return None
+
+        # 유효한 날짜를 가진 데이터만 필터링 및 파싱
+        parsed_data = []
+        for d in data:
+            dt = _safe_parse_date(d.get("date"))
+            if dt:
+                parsed_data.append({**d, "_dt": dt})
+
+        if not parsed_data:
+            return {}
+
         # Sort data by date
-        sorted_data = sorted(data, key=lambda x: datetime.strptime(x["date"], "%Y-%m-%d"))
+        parsed_data.sort(key=lambda x: x["_dt"])
         
-        start_date = datetime.strptime(sorted_data[0]["date"], "%Y-%m-%d")
-        end_date = datetime.strptime(sorted_data[-1]["date"], "%Y-%m-%d")
+        start_date = parsed_data[0]["_dt"]
+        end_date = parsed_data[-1]["_dt"]
         
         trend_lines = {key: [] for key in target_keys}
         
@@ -34,8 +51,8 @@ class TimeSeriesSmoother:
             
             # Find polls within the window
             window_polls = [
-                d for d in sorted_data 
-                if window_start <= datetime.strptime(d["date"], "%Y-%m-%d") <= current_date
+                d for d in parsed_data 
+                if window_start <= d["_dt"] <= current_date
             ]
             
             if window_polls:

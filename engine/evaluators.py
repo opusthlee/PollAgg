@@ -1,6 +1,6 @@
 from typing import List, Dict
 import copy
-from .election import ElectionPredictionModel
+from .aggregator import AggregateAnalysisEngine
 
 class StressTester:
     """
@@ -9,23 +9,34 @@ class StressTester:
     def __init__(self, base_data: List[Dict]):
         self.base_data = copy.deepcopy(base_data)
 
-    def run_shock_scenario(self, shock_data: Dict, target_1: str = "candidate_a", target_2: str = "candidate_b") -> Dict:
+    def run_shock_scenario(self, shock_data: Dict, target_1: str = "target_a", target_2: str = "target_b") -> Dict:
         """
-        Injects a single 'shock' poll to see how much the win probability swings.
+        Injects a single 'shock' data point to see how much the lead probability swings.
         """
         # Run baseline
-        base_model = ElectionPredictionModel(self.base_data)
-        base_probs = base_model.simulate_win_probability(simulations=5000, target_1=target_1, target_2=target_2)
+        base_model = AggregateAnalysisEngine(self.base_data)
+        base_probs = base_model.simulate_superiority(simulations=5000, target_1=target_1, target_2=target_2)
         
         # Inject shock
         shocked_dataset = copy.deepcopy(self.base_data)
         shocked_dataset.append(shock_data)
         
-        shock_model = ElectionPredictionModel(shocked_dataset)
-        shock_probs = shock_model.simulate_win_probability(simulations=5000, target_1=target_1, target_2=target_2)
+        shock_model = AggregateAnalysisEngine(shocked_dataset)
+        shock_probs = shock_model.simulate_superiority(simulations=5000, target_1=target_1, target_2=target_2)
         
         # Calculate Delta
-        delta_1 = shock_probs["target_1_win_prob"] - base_probs["target_1_win_prob"]
+        prob_key = "target_1_lead_prob"
+        
+        # Validation: Check if simulate_superiority returned an error
+        if "error" in base_probs or "error" in shock_probs:
+            return {
+                "status": "Error: Targets not found in simulation",
+                "baseline_prob_a": 0,
+                "shocked_prob_a": 0,
+                "delta_a": 0
+            }
+
+        delta_1 = shock_probs[prob_key] - base_probs[prob_key]
         
         # Analyze fragility
         fragility_status = "Stable"
@@ -35,8 +46,8 @@ class StressTester:
             fragility_status = "Moderately Fragile (Swing > 10%)"
             
         return {
-            "baseline_prob_1": base_probs["target_1_win_prob"],
-            "shocked_prob_1": shock_probs["target_1_win_prob"],
-            "delta_1": delta_1,
+            "baseline_prob_a": base_probs[prob_key],
+            "shocked_prob_a": shock_probs[prob_key],
+            "delta_a": delta_1,
             "status": fragility_status
         }

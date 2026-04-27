@@ -3,3 +3,9 @@ uvicorn
 sqlalchemy
 numpy
 pydantic
+requests
+beautifulsoup4
+lxml
+httpx
+openpyxl
+pdfplumber

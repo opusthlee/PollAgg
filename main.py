@@ -1,53 +1,71 @@
 from typing import List, Dict, Optional
-from engine.election import ElectionPredictionModel
-from engine.survey import SurveyAnalysisModel
+from engine.aggregator import AggregateAnalysisEngine
 from engine.strategies import BayesianAdjustmentStrategy
 from engine.processors import TimeSeriesSmoother
 from engine.evaluators import StressTester
 
 class StatsOptimizer:
     """
-    Main orchestrator for the Stats-Optimizer system.
-    V2 introduces toggleable advanced features via a configuration dictionary.
+    Main orchestrator for the PollAgg General-Purpose Engine.
+    V3: Domain-agnostic orchestration for Politics, Marketing, and Research.
     """
     
     def __init__(self, config: Dict = None):
         self.config = config or {
             "use_correlated_errors": False,
             "use_smoothing": False,
-            "run_stress_test": False
+            "run_stress_test": False,
+            "category": "general"
         }
 
-    def analyze_election(self, data: List[Dict], prior_data: Optional[Dict] = None, fundamentals: Optional[Dict] = None) -> Dict:
+    def analyze_dataset(self, data: List[Dict], prior_data: Optional[Dict] = None, fundamentals: Optional[Dict] = None, bias_data: Optional[Dict] = None) -> Dict:
         """
-        Runs the full election prediction pipeline.
+        Runs the full analysis pipeline on any dataset.
         """
-        model = ElectionPredictionModel(data)
+        if not data:
+            return {"status": "error", "message": "No data provided"}
+
+        # Initialize the generic engine with optional bias data
+        engine = AggregateAnalysisEngine(data, bias_data=bias_data)
         
-        # 1. Feature: Fundamentals Prior
+        # 1. Feature: Bayesian Adjustment (e.g., Fundamentals in politics or Brand Prior in marketing)
         if prior_data or fundamentals:
             bayesian_strategy = BayesianAdjustmentStrategy(
                 prior_results=prior_data or {}, 
                 fundamentals_score=fundamentals,
                 strength=0.15
             )
-            model.strategies.append(bayesian_strategy)
+            engine.strategies.append(bayesian_strategy)
             
-        analysis = model.analyze()
+        analysis = engine.analyze()
         
-        # Extract dynamic targets from config or fallback to defaults
-        target_1 = self.config.get("target_1", "candidate_a")
-        target_2 = self.config.get("target_2", "candidate_b")
+        # Extract dynamic targets from config or auto-detect
+        targets = list(analysis.keys())
+        target_1 = self.config.get("target_1")
+        target_2 = self.config.get("target_2")
+        
+        # Fallback if provided targets are not in the data
+        if not target_1 or target_1 not in analysis:
+            target_1 = targets[0] if len(targets) > 0 else None
+        if not target_2 or target_2 not in analysis:
+            target_2 = targets[1] if len(targets) > 1 else None
 
-        # 2. Feature: Correlated Errors
-        use_corr = self.config.get("use_correlated_errors", False)
-        predictions = model.simulate_win_probability(use_correlated_errors=use_corr, target_1=target_1, target_2=target_2)
+        # 2. Feature: Superiority/Lead Simulation
+        predictions = {}
+        if target_1 and target_2:
+            use_corr = self.config.get("use_correlated_errors", False)
+            predictions = engine.simulate_superiority(
+                use_correlated_errors=use_corr, 
+                target_1=target_1, 
+                target_2=target_2
+            )
         
         result = {
             "status": "success",
+            "category": self.config.get("category", "general"),
             "summary": analysis,
             "prediction": predictions,
-            "total_polls_analyzed": len(data)
+            "total_samples": len(data)
         }
         
         # 3. Feature: Time-Series Smoothing
@@ -56,54 +74,34 @@ class StatsOptimizer:
             result["trend_lines"] = smoother.smooth(data, target_keys=[target_1, target_2])
             
         # 4. Feature: Stress Testing
-        if self.config.get("run_stress_test", False):
+        if self.config.get("run_stress_test", False) and target_1 and target_2:
             tester = StressTester(data)
-            # Inject a sudden 15-point swing to Target 2
+            # Inject a mock shock based on the category (e.g., Target B gets a sudden 5% boost)
             mock_shock = {
-                "agency": "Shock_Poll", "date": "2026-04-25",
-                "results": {target_1: 35, target_2: 50},
-                "sample_size": 2000, "response_rate": 0.2, "method": "CATI"
+                "agency": "Shock_Simulation", "date": "2024-04-10",
+                "results": {target_1: 40, target_2: 45}, # Realistic shock
+                "sample_size": 2000, "response_rate": 0.2, "method": "Digital"
             }
             result["stress_test_report"] = tester.run_shock_scenario(mock_shock, target_1=target_1, target_2=target_2)
 
         return result
 
-    def analyze_general_survey(self, data: List[Dict]) -> Dict:
-        model = SurveyAnalysisModel(data)
-        return model.analyze()
-
 if __name__ == "__main__":
-    # Example Usage
-    sample_polls = [
-        {"agency": "Neutral_1", "date": "2026-04-18", "results": {"candidate_a": 42, "candidate_b": 41}, "sample_size": 1000},
-        {"agency": "Agency_Alpha", "date": "2026-04-20", "results": {"candidate_a": 48, "candidate_b": 38}, "sample_size": 1000},
-        {"agency": "Neutral_2", "date": "2026-04-24", "results": {"candidate_a": 45, "candidate_b": 40}, "sample_size": 1000}
+    # Example: Marketing Research Usage
+    market_data = [
+        {"agency": "Survey_X", "date": "2026-04-10", "results": {"brand_apple": 45, "brand_samsung": 42}, "sample_size": 2000},
+        {"agency": "Survey_Y", "date": "2026-04-20", "results": {"brand_apple": 48, "brand_samsung": 38}, "sample_size": 2000},
     ]
     
-    historical_prior = {"candidate_a": 41.0, "candidate_b": 43.0}
-    fundamentals = {"candidate_a": +1.5, "candidate_b": -1.0} # Good economy for A
-    
-    # Run with all V2 features ON
-    v2_config = {
-        "use_correlated_errors": True,
-        "use_smoothing": True,
-        "run_stress_test": True
+    config = {
+        "category": "marketing",
+        "target_1": "brand_apple",
+        "target_2": "brand_samsung",
+        "use_smoothing": True
     }
     
-    optimizer = StatsOptimizer(config=v2_config)
-    result = optimizer.analyze_election(sample_polls, prior_data=historical_prior, fundamentals=fundamentals)
+    optimizer = StatsOptimizer(config=config)
+    result = optimizer.analyze_dataset(market_data)
     
-    print("=== [V2 Stats-Optimizer Analysis] ===")
-    print(f"Optimized Support: A={result['summary']['candidate_a']['weighted_mean']:.2f}%, B={result['summary']['candidate_b']['weighted_mean']:.2f}%")
-    print(f"A Win Prob: {result['prediction']['candidate_a_win_prob']:.1f}% (Correlated Errors: {result['prediction']['used_correlated_errors']})")
-    
-    if "trend_lines" in result:
-        print("\n[Trend Line Points Generated]")
-        print(f"A Trend Points: {len(result['trend_lines']['candidate_a'])}")
-        
-    if "stress_test_report" in result:
-        report = result['stress_test_report']
-        print(f"\n[Stress Test Report] Status: {report['status']}")
-        print(f"Baseline Win Prob: {report['baseline_prob_a']:.1f}% -> Shocked Prob: {report['shocked_prob_a']:.1f}%")
-        print(f"Delta: {report['delta_a']:.1f}%")
-
+    print(f"=== [PollAgg Analysis: {result['category'].upper()}] ===")
+    print(f"Lead Prob: {result['prediction'].get('target_1_lead_prob', 0):.1f}% for {result['prediction'].get('target_1')}")
