@@ -101,7 +101,7 @@ class ModelValidator:
             "election": actual.agency,
             "election_date": election_date,
             "total_polls_analyzed": len(polls),
-            "overall_mae": np.mean(all_errors) if all_errors else 0,
+            "overall_mae": float(np.mean(all_errors)) if all_errors else 0,
             "agency_analysis": [],
             "method_analysis": {}
         }
@@ -109,14 +109,14 @@ class ModelValidator:
         for agency, data in agency_metrics.items():
             report["agency_analysis"].append({
                 "agency": agency,
-                "avg_error": np.mean(data["errors"]),
+                "avg_error": float(np.mean(data["errors"])),
                 "bias_by_target": {k: float(np.mean(v)) for k, v in data["biases"].items() if v},
                 "poll_count": len(data["errors"])
             })
 
         for method, errs in method_metrics.items():
             if errs:
-                report["method_analysis"][method] = np.mean(errs)
+                report["method_analysis"][method] = float(np.mean(errs))
 
         # 평균 오차 낮은 순으로 정렬
         report["agency_analysis"].sort(key=lambda x: x["avg_error"])

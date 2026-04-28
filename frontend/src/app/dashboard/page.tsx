@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import PollTrendChart from '@/components/PollTrendChart';
+import dynamic from 'next/dynamic';
 import ValidationView from '@/components/ValidationView';
+
+const PollTrendChart = dynamic(() => import('@/components/PollTrendChart'), { ssr: false });
 
 export default function Dashboard() {
   const [analysis, setAnalysis] = useState<any>(null);
@@ -15,23 +17,27 @@ export default function Dashboard() {
   
   // 가상의 분석 라이브러리 (프로젝트 목록)
   const ANALYSIS_LIBRARY = [
-    { id: 'kr_general_22', name: '22대 국회의원 선거 (2024)', category: 'election', endDate: '2024-04-10' },
-    { id: 'kr_presidential_20', name: '20대 대통령 선거 (2022)', category: 'election', endDate: '2022-03-09' },
-    { id: 'kr_local_8', name: '8회 지방선거 (2022)', category: 'election', endDate: '2022-06-01' },
-    { id: 'market_smart_26', name: '2026 스마트폰 시장 점유율', category: 'marketing', endDate: '2026-12-31' }
+    { id: 'kr_local_9', name: '9회 지방선거 (2026)', category: 'local_election', endDate: '2026-06-03', target_1: 'DP_lead', target_2: 'PPP_lead' },
+    { id: 'kr_approval_26', name: '대통령 국정수행 지지도 (2026)', category: 'approval_rating', endDate: '2026-12-31', target_1: 'positive', target_2: 'negative' },
+    { id: 'kr_by_26', name: '6.3 재보궐선거 (2026)', category: 'by_election', endDate: '2026-06-03', target_1: 'DP', target_2: 'PPP' },
+    { id: 'kr_general_22', name: '22대 국회의원 선거 (2024)', category: 'election', endDate: '2024-04-10', target_1: '더불어민주당', target_2: '국민의힘' },
+    { id: 'kr_presidential_20', name: '20대 대통령 선거 (2022)', category: 'election', endDate: '2022-03-09', target_1: '이재명', target_2: '윤석열' },
+    { id: 'kr_local_8', name: '8회 지방선거 (2022)', category: 'election', endDate: '2022-06-01', target_1: '더불어민주당', target_2: '국민의힘' },
+    { id: 'market_smart_26', name: '2026 스마트폰 시장 점유율', category: 'marketing', endDate: '2026-12-31', target_1: 'brand_apple', target_2: 'brand_samsung' }
   ];
 
-  const [selectedProjectId, setSelectedProjectId] = useState('kr_general_22');
+  const [selectedProjectId, setSelectedProjectId] = useState('kr_local_9');
+  const [availableRegions, setAvailableRegions] = useState<string[]>([]);
   
   const [config, setConfig] = useState({
-    category: 'election',
+    category: 'local_election',
     region: '', 
     district: '', 
     use_smoothing: true,
     use_correlated_errors: true,
     run_stress_test: true,
-    target_1: '더불어민주당',
-    target_2: '국민의힘'
+    target_1: 'DP_lead',
+    target_2: 'PPP_lead'
   });
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8002/api';
@@ -49,15 +55,33 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    const fetchAvailable = async () => {
+      const project = ANALYSIS_LIBRARY.find(p => p.id === selectedProjectId) as any;
+      if (!project) return;
+      try {
+        const res = await fetch(`${apiUrl}/data?category=${project.category}`);
+        const data = await res.json();
+        const regions = Array.from(new Set(data.map((d: any) => d.region))).filter(Boolean);
+        setAvailableRegions(regions as string[]);
+      } catch (e) {
+        console.error("Failed to fetch available regions", e);
+      }
+    };
+    fetchAvailable();
+  }, [selectedProjectId]);
+
+  useEffect(() => {
     fetchAnalysis();
   }, [config.category, config.use_smoothing, config.region, config.district, selectedProjectId]);
 
   const fetchAnalysis = async () => {
     setLoading(true);
     try {
-      const currentProject = ANALYSIS_LIBRARY.find(p => p.id === selectedProjectId);
+      const currentProject = ANALYSIS_LIBRARY.find(p => p.id === selectedProjectId) as any;
       const category = currentProject?.category || config.category;
       const endDate = currentProject?.endDate;
+      const target_1 = currentProject?.target_1 || config.target_1;
+      const target_2 = currentProject?.target_2 || config.target_2;
 
       // 1. Fetch raw data with hierarchical filters
       const regionParam = config.region ? `&region=${encodeURIComponent(config.region)}` : '';
@@ -84,7 +108,7 @@ export default function Dashboard() {
         body: JSON.stringify({
           data: rawData,
           category: category,
-          config: config
+          config: { ...config, target_1, target_2 }
         }),
       });
       
@@ -284,7 +308,7 @@ export default function Dashboard() {
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer hover:border-slate-600"
                       >
                         <option value="">광역 단체를 선택하세요</option>
-                        {Object.keys(LOCATION_MAP).map(reg => (
+                        {Object.keys(LOCATION_MAP).filter(reg => availableRegions.includes(reg)).map(reg => (
                           <option key={reg} value={reg}>{reg}</option>
                         ))}
                       </select>

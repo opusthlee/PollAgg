@@ -1,0 +1,59 @@
+{
+  "_comment": "PollAgg \ub370\uc774\ud130 \uc218\uc9d1 \uc124\uc815 \ud30c\uc77c. API \ud0a4\ub97c \uc785\ub825\ud558\uba74 \uc2e4\uc81c \ub370\uc774\ud130\ub97c \uc218\uc9d1\ud569\ub2c8\ub2e4.",
+  "data_sources": {
+    "data_gov_kr": {
+      "enabled": true,
+      "api_key": "",
+      "_key_info": "https://www.data.go.kr \u2192 \uc911\uc559\uc120\uac70\uad00\ub9ac\uc704\uc6d0\ud68c \uc120\uac70\uc5ec\ub860\uc870\uc0ac \u2192 \ud65c\uc6a9\uc2e0\uccad \u2192 \uc77c\ubc18 \uc778\uc99d\ud0a4",
+      "default_sg_id": "20240410",
+      "default_sg_type_code": "2"
+    },
+    "nec_data": {
+      "enabled": true,
+      "api_key": "",
+      "_key_info": "https://data.nec.go.kr \u2192 OpenAPI \u2192 \ud65c\uc6a9\uc2e0\uccad",
+      "default_election_id": "0020240410"
+    },
+    "nesdc": {
+      "enabled": true,
+      "_comment": "\uc911\uc559\uc120\uac70\uc5ec\ub860\uc870\uc0ac\uc2ec\uc758\uc704\uc6d0\ud68c \uc2a4\ud06c\ub798\ud37c. API \ud0a4 \ubd88\ud544\uc694 (\uc6f9 \uc2a4\ud06c\ub798\ud551)",
+      "use_weekly_xls": true,
+      "weekly_pages": 2,
+      "pages": 10,
+      "poll_gubun": "",
+      "sdate": "",
+      "edate": "",
+      "delay": 1.5,
+      "fetch_detail": true,
+      "_poll_gubun_options": [
+        "\ub300\ud1b5\ub839\uc120\uac70",
+        "\uad6d\ud68c\uc758\uc6d0\uc120\uac70",
+        "\uc804\uad6d\ub3d9\uc2dc\uc9c0\ubc29\uc120\uac70",
+        "\uc7ac\ubcf4\uad90\uc120\uac70",
+        ""
+      ]
+    }
+  },
+  "schedule": {
+    "interval_hours": 6,
+    "auto_ingest": false
+  },
+  "ingest_targets": {
+    "elections": [
+      {
+        "name": "22\ub300_\uad6d\ud68c\uc758\uc6d0\uc120\uac70_2024",
+        "sg_id": "20240410",
+        "sg_type_code": "2",
+        "election_id": "0020240410",
+        "category": "election"
+      },
+      {
+        "name": "20\ub300_\ub300\ud1b5\ub839\uc120\uac70_2022",
+        "sg_id": "20220309",
+        "sg_type_code": "1",
+        "election_id": "0120220309",
+        "category": "election"
+      }
+    ]
+  }
+}

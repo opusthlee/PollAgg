@@ -102,9 +102,12 @@ class HouseBiasStrategy(BaseStrategy):
             agency = item.get("agency")
             if agency in self.bias_table:
                 biases = self.bias_table[agency]
+                # Create a copy of results to avoid in-place modification compounding
+                new_results = item["results"].copy()
                 for key, bias_val in biases.items():
-                    if key in item["results"]:
-                        item["results"][key] -= bias_val
+                    if key in new_results:
+                        new_results[key] -= bias_val
+                item["results"] = new_results
         return weights
 
 class BayesianAdjustmentStrategy(BaseStrategy):
@@ -119,7 +122,8 @@ class BayesianAdjustmentStrategy(BaseStrategy):
 
     def apply(self, data: List[Dict], weights: List[float]) -> List[float]:
         for item in data:
-            results = item["results"]
+            # Create a copy of results to avoid in-place modification compounding
+            results = item["results"].copy()
             for key, prior_val in self.prior_results.items():
                 if key in results:
                     # If fundamentals exist for this candidate, adjust the prior slightly
@@ -128,5 +132,6 @@ class BayesianAdjustmentStrategy(BaseStrategy):
                     
                     # Blend the poll result with the adjusted prior
                     results[key] = (results[key] * (1 - self.strength)) + (adjusted_prior * self.strength)
+            item["results"] = results
         return weights
 

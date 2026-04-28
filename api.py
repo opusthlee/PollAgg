@@ -33,6 +33,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+class BatchAnalysisRequest(BaseModel):
+    data: List[Dict]
+    category: str
+    config: Dict
+    regions: List[str]
+
 class AnalyzeRequest(BaseModel):
     data: List[Dict]
     category: Optional[str] = "general"
@@ -226,6 +233,19 @@ async def get_validation_report(date: str = "2024-04-10", region: Optional[str] 
         return {"status": "error", "message": "Validation data not found for selected scope"}
     return report
 
+
+@app.post("/api/batch-analyze")
+async def run_batch_analysis(req: BatchAnalysisRequest, db: Session = Depends(get_db)):
+    results = {}
+    optimizer = StatsOptimizer(config=req.config)
+    base_data = [d for d in req.data if d.get("category") == req.category]
+    for region in req.regions:
+        region_data = [d for d in base_data if d.get("region") == region or (region == "National" and d.get("region") in [None, "National"])]
+        if not region_data: continue
+        analysis = optimizer.analyze_dataset(data=region_data)
+        results[region] = analysis
+    return results
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("api:app", host="0.0.0.0", port=8002, reload=True)
+    uvicorn.run("api:app", host="127.0.0.1", port=8002, reload=False)

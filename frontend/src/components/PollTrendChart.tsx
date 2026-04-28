@@ -93,26 +93,26 @@ export default function PollTrendChart({ data, title }: ChartProps) {
         const day = date.getDate().toString().padStart(2, '0');
 
         const isMouseNear = hoverX !== null && Math.abs(xPos - hoverX) < 20;
-        const fontSize = isMouseNear ? 11 : 8;
-        const rowHeight = fontSize + 4;
+        const fontSize = isMouseNear ? 16 : 12;
+        const rowHeight = fontSize + 6;
         const startY = area.bottom + 8;
 
         ctx.font = `${isMouseNear ? 'bold' : 'normal'} ${fontSize}px sans-serif`;
 
-        // Row 1: Year (Red) - Only show when it changes
+        // Row 1: Year (Orange) - Only show when it changes
         if (!prevDate || date.getFullYear() !== prevDate.getFullYear()) {
-          ctx.fillStyle = '#ef4444';
+          ctx.fillStyle = '#f97316';
           ctx.fillText(year, xPos, startY);
         }
 
-        // Row 2: Month (Orange) - Only show when it changes
+        // Row 2: Month (Yellow) - Only show when it changes
         if (!prevDate || date.getMonth() !== prevDate.getMonth()) {
-          ctx.fillStyle = '#f97316';
+          ctx.fillStyle = '#eab308';
           ctx.fillText(month, xPos, startY + rowHeight);
         }
 
-        // Row 3: Day (Blue) - Always show
-        ctx.fillStyle = '#3b82f6';
+        // Row 3: Day (Red) - Always show
+        ctx.fillStyle = '#ef4444';
         ctx.fillText(day, xPos, startY + rowHeight * 2);
       });
       ctx.restore();

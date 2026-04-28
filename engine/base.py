@@ -21,9 +21,14 @@ class BaseStatisticalModel:
         """
         Executes all strategies in order.
         """
+        if hasattr(self, "_pipeline_run") and self._pipeline_run:
+            return
+            
         # Apply each strategy to update weights or data
         for strategy in self.strategies:
             self.weights = strategy.apply(self.raw_data, self.weights)
+        
+        self._pipeline_run = True
         
     def calculate_weighted_mean(self, key: str) -> float:
         values = np.array([item["results"].get(key, 0) for item in self.raw_data])
@@ -56,4 +61,5 @@ class BaseStatisticalModel:
                 "sample_size": len(self.raw_data)
             }
             
+        self.results = analysis
         return analysis

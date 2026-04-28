@@ -18,3 +18,13 @@ frontend/.env.local
 
 # Logs
 *.log
+
+# Secrets / runtime
+.env
+.env.*
+!.env.example
+nginx/certs/
+nginx/webroot/
+
+# Scratch / working files
+scratch/

@@ -73,26 +73,25 @@ class AggregateAnalysisEngine(BaseStatisticalModel):
         # 3. Final Uncertainty Score
         uncertainty = np.clip(poll_std * sample_error_reduction + 1.0, 2.0, 10.0)
         
+        import math
         if use_correlated_errors:
-            # Systemic bias simulation
-            systemic_error = np.random.normal(0, uncertainty * 0.5, simulations)
-            sim_1 = np.random.normal(mean_1, uncertainty * 0.8, simulations) + systemic_error
-            sim_2 = np.random.normal(mean_2, uncertainty * 0.8, simulations) - systemic_error
+            std_total = math.sqrt(2 * (0.8 * uncertainty)**2 + 2 * (0.5 * uncertainty)**2)
         else:
-            sim_1 = np.random.normal(mean_1, uncertainty, simulations)
-            sim_2 = np.random.normal(mean_2, uncertainty, simulations)
-        
-        wins_1 = np.sum(sim_1 > sim_2)
+            std_total = math.sqrt(2 * (uncertainty**2))
+            
+        gap = mean_1 - mean_2
+        z_score = gap / std_total if std_total > 0 else 0
+        prob_1 = 0.5 * (1 + math.erf(z_score / math.sqrt(2)))
         
         return {
             "target_1": target_1,
             "target_2": target_2,
             "target_1_value": float(mean_1),
             "target_2_value": float(mean_2),
-            "expected_gap": float(mean_1 - mean_2),
-            "target_1_lead_prob": (wins_1 / simulations) * 100,
-            "target_2_lead_prob": (1 - (wins_1 / simulations)) * 100,
-            "simulations_run": simulations,
+            "expected_gap": float(gap),
+            "target_1_lead_prob": prob_1 * 100,
+            "target_2_lead_prob": (1 - prob_1) * 100,
+            "simulations_run": 0,
             "calculated_uncertainty": float(uncertainty),
             "used_correlated_errors": use_correlated_errors
         }
