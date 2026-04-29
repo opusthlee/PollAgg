@@ -26,6 +26,7 @@ frontend/.env.local
 nginx/certs/
 nginx/webroot/
 nginx/.htpasswd
+.cron.env
 
 # Scratch / working files
 scratch/

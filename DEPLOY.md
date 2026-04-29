@@ -110,7 +110,52 @@ docker compose restart nginx
 - 백엔드 API(`api-poll.dailyprizm.com`)의 POST/PUT/DELETE도 향후 보호 권장
   (현재는 nginx UI 인증만 적용)
 
-## 8. 운영 체크리스트
+## 8. 자동 데이터 수집 (cron)
+
+`scripts/cron_ingest.sh`가 매일 정해진 시각에 백엔드 컨테이너에서
+`pipeline/run_ingestion.py`를 실행. flock으로 중복 실행 방지,
+600s timeout, 실패 시 `logs/alerts.log`에 마커 + Slack/ntfy 웹훅 발송(선택).
+
+### 최초 1회 — 등록
+```bash
+# 서버 (timezone Asia/Seoul 권장)
+sudo timedatectl set-timezone Asia/Seoul
+
+cd ~/pollagg
+chmod +x scripts/cron_ingest.sh
+mkdir -p logs
+
+# crontab에 등록 — 매일 04:00 KST
+( crontab -l 2>/dev/null; echo "0 4 * * * /home/ubuntu/pollagg/scripts/cron_ingest.sh" ) | crontab -
+crontab -l   # 확인
+
+# 수동 1회 테스트
+./scripts/cron_ingest.sh
+tail -30 logs/ingest.log
+```
+
+### 알림 활성화 (선택)
+```bash
+cp .cron.env.example .cron.env
+nano .cron.env   # SLACK_WEBHOOK 또는 NTFY_TOPIC 설정
+# 다음 cron 실행부터 자동 반영 — 재시작 불필요
+```
+
+### 로그 로테이션 (권장)
+```bash
+sudo tee /etc/logrotate.d/pollagg <<'EOF'
+/home/ubuntu/pollagg/logs/*.log {
+    daily
+    rotate 30
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
+EOF
+```
+
+## 9. 운영 체크리스트
 - [ ] Lightsail 방화벽: 22 (내 IP), 80 (Anywhere), 443 (Anywhere)
 - [ ] `.env`는 인스턴스 외부에 백업 (1Password 등)
 - [ ] `docker compose logs --tail 100 -f` 로 첫 트래픽 모니터링
