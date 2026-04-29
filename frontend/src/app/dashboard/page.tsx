@@ -129,15 +129,6 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto">
         <header className="flex justify-between items-center mb-12">
           <div className="flex items-center gap-6">
-            <Link 
-              href="/" 
-              className="p-2 hover:bg-slate-800 rounded-full transition-colors group"
-              title="관리 도구로 돌아가기"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-slate-400 group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-            </Link>
             <div>
               <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
                 여론조사 통합 분석 엔진
@@ -145,8 +136,8 @@ export default function Dashboard() {
               <p className="text-slate-400 mt-1">고급 통계 분석 시스템 v3.0</p>
             </div>
           </div>
-          <div className="flex gap-4">
-            <select 
+          <div className="flex gap-4 items-center">
+            <select
               value={config.category}
               onChange={(e) => setConfig({...config, category: e.target.value})}
               className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -155,12 +146,23 @@ export default function Dashboard() {
               <option value="marketing">시장 조사</option>
               <option value="social">사회 통계</option>
             </select>
-            <button 
+            <button
               onClick={fetchAnalysis}
               className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg text-sm font-medium transition-all shadow-lg shadow-indigo-500/20"
             >
               재계산
             </button>
+            {/* 관리자 진입 — /admin 클릭 시 nginx Basic Auth 팝업 트리거 */}
+            <Link
+              href="/admin"
+              title="관리자 로그인 (Basic Auth)"
+              className="flex items-center gap-1.5 border border-slate-700 hover:border-amber-500/60 hover:bg-amber-500/10 text-slate-400 hover:text-amber-300 px-3 py-2 rounded-lg text-xs font-semibold transition-all"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              관리자
+            </Link>
           </div>
         </header>
 
@@ -204,11 +206,11 @@ export default function Dashboard() {
               >
                 다시 시도
               </button>
-              <Link 
-                href="/"
+              <Link
+                href="/admin"
                 className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg text-sm font-medium transition-all"
               >
-                데이터 관리자로 이동
+                데이터 관리자로 이동 🔒
               </Link>
             </div>
           </div>
