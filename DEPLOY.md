@@ -71,7 +71,46 @@ sudo crontab -e
 0 3 * * * certbot renew --quiet --deploy-hook "cd /home/ubuntu/pollagg && cp -rL /etc/letsencrypt/live ./nginx/certs/live && docker compose exec nginx nginx -s reload"
 ```
 
-## 7. 운영 체크리스트
+## 7. 관리자 영역 (`/admin`) Basic Auth 설정
+
+`/` 루트는 `/dashboard`로 자동 리디렉트되는 공개 화면.
+데이터 입력·수식 보정·DB 관리는 `/admin` 경로 (Basic Auth 필수).
+
+### 최초 1회 — 관리자 계정 생성
+```bash
+# 서버에서
+cd ~/pollagg
+
+# 1) htpasswd 도구 설치 (없으면)
+sudo apt-get install -y apache2-utils
+
+# 2) admin 계정 생성 (-c는 새 파일 생성, 이미 있으면 -c 빼고 사용자 추가)
+htpasswd -c nginx/.htpasswd admin
+# → New password: 입력 (강력하게 — 1Password 등에 저장)
+
+# 3) nginx 컨테이너 재시작 (.htpasswd 마운트 반영)
+docker compose restart nginx
+
+# 4) 검증
+curl -o /dev/null -w "%{http_code}\n" https://poll.dailyprizm.com/admin
+# → 401 (정상 — 인증 필요)
+curl -u admin:비밀번호 -o /dev/null -w "%{http_code}\n" https://poll.dailyprizm.com/admin
+# → 200
+```
+
+### 사용자 추가/변경
+```bash
+htpasswd nginx/.htpasswd 사용자명     # 추가
+htpasswd -D nginx/.htpasswd 사용자명  # 삭제
+docker compose restart nginx
+```
+
+### 보안 메모
+- `nginx/.htpasswd`는 `.gitignore` 처리됨 — 절대 커밋 금지
+- 백엔드 API(`api-poll.dailyprizm.com`)의 POST/PUT/DELETE도 향후 보호 권장
+  (현재는 nginx UI 인증만 적용)
+
+## 8. 운영 체크리스트
 - [ ] Lightsail 방화벽: 22 (내 IP), 80 (Anywhere), 443 (Anywhere)
 - [ ] `.env`는 인스턴스 외부에 백업 (1Password 등)
 - [ ] `docker compose logs --tail 100 -f` 로 첫 트래픽 모니터링

@@ -25,6 +25,7 @@ frontend/.env.local
 !.env.example
 nginx/certs/
 nginx/webroot/
+nginx/.htpasswd
 
 # Scratch / working files
 scratch/
