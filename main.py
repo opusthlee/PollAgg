@@ -74,13 +74,23 @@ class StatsOptimizer:
             result["trend_lines"] = smoother.smooth(data, target_keys=[target_1, target_2])
             
         # 4. Feature: Stress Testing
+        # 의미 있는 stress test: 현재 리딩 후보를 challenge하는 방향으로 shock 주입.
+        # (이미 우세한 쪽을 더 밀면 확률이 saturation에 걸려 변동 0이 되어버림)
         if self.config.get("run_stress_test", False) and target_1 and target_2:
             tester = StressTester(data)
-            # Inject a mock shock based on the category (e.g., Target B gets a sudden 5% boost)
+            mean_1 = analysis.get(target_1, {}).get("weighted_mean", 0)
+            mean_2 = analysis.get(target_2, {}).get("weighted_mean", 0)
+            if mean_1 >= mean_2:
+                # target_1이 리드 → target_2 우세 shock
+                shock_results = {target_1: 40, target_2: 50}
+            else:
+                # target_2가 리드 → target_1 우세 shock
+                shock_results = {target_1: 50, target_2: 40}
             mock_shock = {
                 "agency": "Shock_Simulation", "date": "2024-04-10",
-                "results": {target_1: 40, target_2: 45}, # Realistic shock
-                "sample_size": 2000, "response_rate": 0.2, "method": "Digital"
+                "survey_date": "2024-04-10",
+                "results": shock_results,
+                "sample_size": 2000, "response_rate": 0.2, "method": "Digital",
             }
             result["stress_test_report"] = tester.run_shock_scenario(mock_shock, target_1=target_1, target_2=target_2)
 

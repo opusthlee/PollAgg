@@ -379,6 +379,22 @@ export default function Dashboard() {
             <main className="lg:col-span-3 space-y-8">
               {activeTab === 'trend' ? (
                 <>
+                  {/* 데이터 품질 경고 배너 */}
+                  {analysis?.prediction?.warnings?.length > 0 && (
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex gap-3 items-start">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <div className="text-xs text-amber-200 space-y-1">
+                        <div className="font-bold text-amber-300">데이터 품질 경고 (n={analysis?.prediction?.n_polls})</div>
+                        {analysis.prediction.warnings.map((w: string, i: number) => (
+                          <div key={i} className="text-amber-200/80">• {w}</div>
+                        ))}
+                        <div className="text-[10px] text-amber-200/60 italic pt-1">표본이 작거나 saturation에 걸린 경우 표시 확률은 cap이 적용됨 (≤0.5% / ≥99.5%).</div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Top Metrics */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 relative overflow-hidden">
