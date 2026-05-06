@@ -3,6 +3,7 @@ import logging
 from typing import List, Dict, Any, Optional, Set
 from sqlalchemy.orm import Session
 from db.models import SurveyData, EngineConfig
+from utils.dates import normalize_raw_date
 
 logger = logging.getLogger(__name__)
 
@@ -170,10 +171,15 @@ class DataIngestor:
                 skipped_count += 1
                 continue
 
+            survey_date, survey_year, survey_week = normalize_raw_date(date)
+
             entry = SurveyData(
                 category=item.get("category", category),
                 agency=agency,
                 date=date,
+                survey_date=survey_date,
+                survey_year=survey_year,
+                survey_week=survey_week,
                 results=item["results"],
                 sample_size=int(item.get("sample_size", 1000)),
                 method=item.get("method", "Unknown"),

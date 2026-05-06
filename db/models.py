@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, String, Float, JSON, Date, DateTime
+from sqlalchemy import Boolean, Column, Integer, SmallInteger, String, Float, JSON, Date, DateTime
 import datetime
 from .database import Base
 
@@ -12,18 +12,24 @@ class SurveyData(Base):
     id = Column(Integer, primary_key=True, index=True)
     category = Column(String, index=True, default="election") # election, marketing, social, etc.
     agency = Column(String, index=True)
-    date = Column(String, index=True)
+    date = Column(String, index=True)  # raw 입력 보존 (정규화 실패 케이스 추적용)
+    # 정규화된 날짜 컬럼 (2026-05-06 추가).
+    # survey_date: ISO YYYY-MM-DD로 환산 가능한 경우 (단일 날짜 측정)
+    # survey_year/week: NESDC 주간 집계처럼 (연도, 주차)만 있는 경우
+    survey_date = Column(Date, index=True, nullable=True)
+    survey_year = Column(SmallInteger, index=True, nullable=True)
+    survey_week = Column(SmallInteger, nullable=True)
     region = Column(String, index=True, nullable=True) # e.g. 서울, 경기, 호남
     district = Column(String, index=True, nullable=True) # e.g. 종로구, 해운대구갑
     results = Column(JSON)
     sample_size = Column(Integer)
     method = Column(String, nullable=True)
     response_rate = Column(Float, nullable=True)
-    
+
     # Flags for manual overrides
     is_manual_override = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True) # If false, the engine ignores it
-    
+
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 class AgencyBias(Base):
