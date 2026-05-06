@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -23,6 +24,9 @@ if not os.path.exists("static"):
     os.makedirs("static")
 
 app = FastAPI(title="PollAgg General-Purpose API")
+
+# Compress JSON responses ≥1KB. /api/data is ~4MB uncompressed; gzip cuts it ~85%.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 # Add CORS middleware
 app.add_middleware(

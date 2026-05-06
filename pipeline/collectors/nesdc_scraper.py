@@ -21,7 +21,7 @@ Source 3: https://www.nesdc.go.kr
 import re
 import time
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 
 import requests
 from bs4 import BeautifulSoup
@@ -221,6 +221,7 @@ class NesdcScraper(BaseCollector):
         edate: str = "",
         delay: float = 1.5,
         fetch_detail: bool = True,
+        known_ntt_ids: Optional[Set[str]] = None,
         **kwargs,
     ) -> List[Dict[str, Any]]:
         """
@@ -233,6 +234,10 @@ class NesdcScraper(BaseCollector):
             edate:         종료일 (YYYY-MM-DD)
             delay:         페이지 간 요청 딜레이 (초)
             fetch_detail:  True면 상세 페이지에서 표본크기/응답률 보강
+            known_ntt_ids: 이전 실행에서 이미 본 ntt_id set.
+                           매칭되는 항목은 상세요청 없이 skip하고,
+                           한 페이지가 전부 매칭되면 조기 종료.
+                           ※ 목록은 등록번호 내림차순이므로 page-level 조기 종료가 안전함.
         """
         all_results: List[Dict[str, Any]] = []
 
@@ -243,15 +248,24 @@ class NesdcScraper(BaseCollector):
                 logger.info(f"[NESDC] page={page}: 데이터 없음. 중단.")
                 break
 
+            new_count = 0
             for item in items:
-                if fetch_detail and item["ntt_id"]:
+                ntt_id = item.get("ntt_id", "") or ""
+                if known_ntt_ids is not None and ntt_id and ntt_id in known_ntt_ids:
+                    continue
+                new_count += 1
+                if fetch_detail and ntt_id:
                     item = self._enrich_with_detail(item)
                     time.sleep(delay * 0.4)
                 all_results.append(item)
 
+            if known_ntt_ids is not None and new_count == 0:
+                logger.info(f"[NESDC] page={page}: 모두 기존 ntt_id, 조기 중단")
+                break
+
             time.sleep(delay)
 
-        logger.info(f"[NESDC] 전체 수집: {len(all_results)}건")
+        logger.info(f"[NESDC] 전체 수집: {len(all_results)}건 (신규)")
         return all_results
 
     # ------------------------------------------------------------------

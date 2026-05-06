@@ -1,10 +1,35 @@
 import json
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 from sqlalchemy.orm import Session
-from db.models import SurveyData
+from db.models import SurveyData, EngineConfig
 
 logger = logging.getLogger(__name__)
+
+# DB 영속 캐시 키 (engine_configs 테이블 활용)
+NESDC_SEEN_KEY = "nesdc_seen_ntt_ids"
+
+
+def _load_nesdc_seen(db: Session) -> Set[str]:
+    cfg = db.query(EngineConfig).filter_by(config_key=NESDC_SEEN_KEY).first()
+    if cfg and isinstance(cfg.config_value, list):
+        return {str(x) for x in cfg.config_value if x}
+    return set()
+
+
+def _save_nesdc_seen(db: Session, ids: Set[str]) -> None:
+    sorted_ids = sorted(ids)
+    cfg = db.query(EngineConfig).filter_by(config_key=NESDC_SEEN_KEY).first()
+    if cfg:
+        cfg.config_value = sorted_ids
+    else:
+        cfg = EngineConfig(
+            config_key=NESDC_SEEN_KEY,
+            config_value=sorted_ids,
+            description="NESDC scraper seen ntt_id cache for list-page early-stop",
+        )
+        db.add(cfg)
+    db.commit()
 
 
 class DataIngestor:
@@ -68,7 +93,7 @@ class DataIngestor:
         if nesdc_cfg.get("enabled", False):
             logger.info("[Ingestor] NESDC 스크래퍼 수집 시작...")
             scraper = NesdcScraper()
-            
+
             # 주간 주요 데이터 (XLS) 우선 수집 (지지율 포함)
             if nesdc_cfg.get("use_weekly_xls", True):
                 logger.info("[Ingestor] NESDC 주간 주요 데이터(XLS) 수집 중...")
@@ -76,7 +101,11 @@ class DataIngestor:
                 saved_xls = self.parse_and_save_json(xls_data, category="election")
                 results_summary["nesdc_xls"] = saved_xls
 
-            # 목록 페이지 수집 (메타데이터 위주)
+            # early-stop: ntt_id는 polls 테이블에 없으므로 engine_configs에 영속.
+            # 첫 실행은 캐시 비어있어 풀스캔, 이후엔 페이지 전체가 known일 때 조기 중단.
+            seen_ntt_ids = _load_nesdc_seen(self.db)
+            logger.info(f"[Ingestor] NESDC seen-cache 로드: {len(seen_ntt_ids)}건")
+
             data = scraper.collect(
                 pages=nesdc_cfg.get("pages", 1),
                 poll_gubun=nesdc_cfg.get("poll_gubun", ""),
@@ -84,7 +113,20 @@ class DataIngestor:
                 edate=nesdc_cfg.get("edate", ""),
                 delay=nesdc_cfg.get("delay", 1.5),
                 fetch_detail=nesdc_cfg.get("fetch_detail", True),
+                known_ntt_ids=seen_ntt_ids,
             )
+
+            # collect()의 normalize 결과는 meta.ntt_id에 저장됨
+            new_ntt_ids = {
+                d["meta"]["ntt_id"]
+                for d in data
+                if isinstance(d.get("meta"), dict) and d["meta"].get("ntt_id")
+            }
+            if new_ntt_ids:
+                seen_ntt_ids.update(new_ntt_ids)
+                _save_nesdc_seen(self.db, seen_ntt_ids)
+                logger.info(f"[Ingestor] NESDC seen-cache 갱신: +{len(new_ntt_ids)}건 → 총 {len(seen_ntt_ids)}")
+
             saved = self.parse_and_save_json(data, category="election")
             results_summary["nesdc_list"] = saved
 
