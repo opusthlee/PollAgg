@@ -28,14 +28,26 @@ app = FastAPI(title="PollAgg General-Purpose API")
 # Compress JSON responses ≥1KB. /api/data is ~4MB uncompressed; gzip cuts it ~85%.
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
-# Add CORS middleware
+# CORS: 프로덕션 origin만 허용. 개발 시 CORS_ALLOWED_ORIGINS 환경변수로 override (콤마 구분).
+_default_origins = [
+    "https://poll.dailyprizm.com",
+    "https://dailyprizm.com",
+    "https://www.dailyprizm.com",
+]
+_origins_env = os.environ.get("CORS_ALLOWED_ORIGINS", "").strip()
+allow_origins = (
+    [o.strip() for o in _origins_env.split(",") if o.strip()]
+    if _origins_env
+    else _default_origins
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict this
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+logger.info(f"CORS allow_origins: {allow_origins}")
 
 
 class BatchAnalysisRequest(BaseModel):
