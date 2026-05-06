@@ -98,7 +98,7 @@ export default function MiniDashboard({
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      onClick={() => window.open(`${dashboardUrl}/view`, '_blank')}
+      onClick={() => window.open(`${dashboardUrl}/dashboard`, '_blank')}
     >
       {/* Background Glow */}
       <div className="absolute -top-16 -left-16 w-32 h-32 bg-indigo-600/15 rounded-full blur-[60px]"></div>
