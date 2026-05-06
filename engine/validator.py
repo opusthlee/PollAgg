@@ -1,10 +1,19 @@
 import logging
-from typing import List, Dict, Any
+from datetime import date as _date
+from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from db.models import SurveyData
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_iso(s: str) -> Optional[_date]:
+    try:
+        from datetime import datetime
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
 
 class ModelValidator:
     """
@@ -18,29 +27,35 @@ class ModelValidator:
         특정 선거의 실제 결과와 여론조사들을 비교 분석합니다.
         범위(region, district)를 지정하여 지역별 정확도를 분석할 수 있습니다.
         """
-        # 1. 실제 결과 데이터 가져오기
+        election_date_obj = _parse_iso(election_date)
+        if not election_date_obj:
+            logger.warning(f"election_date 파싱 실패: {election_date!r}")
+            return None
+
+        # 1. 실제 결과 데이터 가져오기 (Date 컬럼으로 비교)
         actual_query = self.db.query(SurveyData).filter(
-            SurveyData.category == "election_result", 
-            SurveyData.date == election_date
+            SurveyData.category == "election_result",
+            SurveyData.survey_date == election_date_obj,
         )
-        
+
         if region:
             actual_query = actual_query.filter(SurveyData.region == region)
         if district:
             actual_query = actual_query.filter(SurveyData.district.like(f"%{district}%"))
-            
+
         actual = actual_query.first()
-        
+
         if not actual:
             logger.warning(f"[{election_date}] {region or '전국'} {district or ''}에 해당하는 실제 결과 데이터가 없습니다.")
             return None
 
         actual_results = actual.results  # e.g., {"더불어민주당": 45.2, "국민의힘": 38.0, ...}
-        
-        # 2. 분석 대상 여론조사들 가져오기 (선거일 이전 데이터)
+
+        # 2. 분석 대상 여론조사들 가져오기 (선거일 이전, survey_date 있는 행만)
         poll_query = self.db.query(SurveyData).filter(
-            SurveyData.category == category, 
-            SurveyData.date < election_date
+            SurveyData.category == category,
+            SurveyData.survey_date.isnot(None),
+            SurveyData.survey_date < election_date_obj,
         )
         
         if region:

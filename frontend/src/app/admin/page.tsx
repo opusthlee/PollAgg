@@ -8,10 +8,20 @@ interface SurveyData {
   category: string;
   agency: string;
   date: string;
+  survey_date: string | null;
+  survey_year: number | null;
+  survey_week: number | null;
   results: Record<string, number>;
   sample_size: number;
   method: string | null;
   is_manual_override: boolean;
+}
+
+function formatDate(p: { survey_date: string | null; survey_year: number | null; survey_week: number | null; date: string }): string {
+  if (p.survey_date) return p.survey_date;
+  if (p.survey_year != null && p.survey_week != null) return `${p.survey_year}-W${String(p.survey_week).padStart(2, '0')}`;
+  if (p.survey_year != null) return `${p.survey_year}`;
+  return p.date || '—';
 }
 
 export default function Home() {
@@ -200,7 +210,7 @@ export default function Home() {
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-900">{point.agency}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-slate-600 text-sm">{point.date}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-600 text-sm" title={`raw: ${point.date}`}>{formatDate(point)}</td>
                           <td className="px-6 py-4 text-slate-600 text-sm font-mono truncate max-w-[200px]">
                             {JSON.stringify(point.results)}
                           </td>

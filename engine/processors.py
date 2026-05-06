@@ -23,13 +23,13 @@ class TimeSeriesSmoother:
             try:
                 return datetime.strptime(d_str, "%Y-%m-%d")
             except (ValueError, TypeError):
-                # 기본값 또는 건너뛰기를 위해 None 반환
                 return None
 
-        # 유효한 날짜를 가진 데이터만 필터링 및 파싱
+        # survey_date(정규화) 우선, 없으면 raw date 시도. 둘 다 실패면 시계열 분석 대상에서 제외.
+        # NESDC 주간 집계(survey_week)는 단일 날짜가 없어 본 시계열에선 제외하는 게 정확.
         parsed_data = []
         for d in data:
-            dt = _safe_parse_date(d.get("date"))
+            dt = _safe_parse_date(d.get("survey_date")) or _safe_parse_date(d.get("date"))
             if dt:
                 parsed_data.append({**d, "_dt": dt})
 

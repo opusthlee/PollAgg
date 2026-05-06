@@ -91,9 +91,9 @@ export default function Dashboard() {
       
       let rawData = await dataRes.json();
 
-      // [FIX] Filter data by project's end date
+      // 프로젝트 endDate 기준 필터: 정규화된 survey_date 우선, 없으면 raw date.
       if (endDate) {
-        rawData = rawData.filter((d: any) => d.date <= endDate);
+        rawData = rawData.filter((d: any) => (d.survey_date ?? d.date) <= endDate);
       }
 
       if (!rawData || rawData.length === 0) {

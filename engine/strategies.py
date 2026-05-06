@@ -29,18 +29,16 @@ class TimeDecayStrategy(BaseStrategy):
     def apply(self, data: List[Dict], weights: List[float]) -> List[float]:
         new_weights = []
         for i, item in enumerate(data):
-            # Expects item to have a 'date' field
-            date_str = item.get("date")
+            # survey_date(ISO) 우선, fallback raw date. 둘 다 파싱 실패하면 decay 미적용.
+            date_str = item.get("survey_date") or item.get("date")
             if not date_str:
                 new_weights.append(weights[i])
                 continue
-                
+
             try:
                 item_date = datetime.strptime(date_str, "%Y-%m-%d")
             except (ValueError, TypeError):
-                # 날짜 파싱 실패 시 현재 날짜로부터 30일 전으로 가정하거나 가중치 보존
-                if date_str:
-                    logger.warning(f"Invalid date format: '{date_str}'. Expected YYYY-MM-DD. Skipping decay.")
+                # 주간 집계(YY-WW) 등 단일 날짜로 환산 불가한 입력 → decay 미적용 (가중치 보존)
                 new_weights.append(weights[i])
                 continue
 

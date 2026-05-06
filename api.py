@@ -108,8 +108,24 @@ def analyze(req: AnalyzeRequest, db: Session = Depends(get_db)):
     return result
 
 @app.get("/api/data")
-def get_data(category: Optional[str] = None, region: Optional[str] = None, district: Optional[str] = None, db: Session = Depends(get_db)):
-    logger.info(f"Data requested for category: {category}, region: {region}, district: {district}")
+def get_data(
+    category: Optional[str] = None,
+    region: Optional[str] = None,
+    district: Optional[str] = None,
+    since: Optional[str] = None,
+    until: Optional[str] = None,
+    include_undated: bool = True,
+    db: Session = Depends(get_db),
+):
+    """
+    since/until: ISO YYYY-MM-DD. survey_date 기준 필터.
+    include_undated: False면 survey_date IS NULL 행 제외 (주간 집계 등).
+    """
+    from datetime import datetime as _dt
+    logger.info(
+        f"Data requested category={category} region={region} district={district} "
+        f"since={since} until={until} include_undated={include_undated}"
+    )
     query = db.query(SurveyData).filter(SurveyData.is_active == True)
     if category:
         query = query.filter(SurveyData.category == category)
@@ -117,7 +133,22 @@ def get_data(category: Optional[str] = None, region: Optional[str] = None, distr
         query = query.filter(SurveyData.region == region)
     if district:
         query = query.filter(SurveyData.district.like(f"%{district}%"))
-        
+
+    def _parse(s: str):
+        try:
+            return _dt.strptime(s, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail=f"invalid date: {s!r} (expected YYYY-MM-DD)")
+
+    # since/until은 survey_date 기준. NULL은 비교 시 자동 제외됨.
+    if since:
+        query = query.filter(SurveyData.survey_date >= _parse(since))
+    if until:
+        query = query.filter(SurveyData.survey_date <= _parse(until))
+    # since/until 둘 다 없을 때만 include_undated 의미 있음.
+    if not since and not until and not include_undated:
+        query = query.filter(SurveyData.survey_date.isnot(None))
+
     results = query.all()
     logger.info(f"Returning {len(results)} items")
     return results
