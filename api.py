@@ -33,19 +33,20 @@ _default_origins = [
     "https://poll.dailyprizm.com",
     "https://dailyprizm.com",
     "https://www.dailyprizm.com",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
 ]
 _extra = [o.strip() for o in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if o.strip()]
 allow_origins = list(dict.fromkeys(_default_origins + _extra))  # 중복 제거, 순서 유지
+# 모든 localhost/127.0.0.1 포트 허용 (개발용)
+_localhost_regex = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,
+    allow_origin_regex=_localhost_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-logger.info(f"CORS allow_origins: {allow_origins}")
+logger.info(f"CORS allow_origins: {allow_origins} + regex({_localhost_regex})")
 
 
 class BatchAnalysisRequest(BaseModel):
